@@ -91,3 +91,5 @@ tr.plan td:first-child{border-left:3px solid var(--accent)}
 .dd-row{display:flex;justify-content:space-between;gap:.6rem;font-size:.9rem}
 .track{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:.2rem}
 .track>div{height:100%;border-radius:99px;transition:width .3s}
+
+.ok{color:var(--ok);margin:.2rem 0 .6rem;font-weight:600}

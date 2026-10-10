@@ -6,7 +6,7 @@
   <title>Cognitive Balance 2.0</title>
   <meta name="description" content="Support healthier routines, focus, and balance. Track deep work vs recovery and spot burnout early.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.1">
 </head>
 <body>
   <header class="top">
@@ -51,7 +51,7 @@
       <div class="grid-planner">
         <form id="add-form" class="card" autocomplete="off">
           <h3>Add activity</h3>
-          <label>Name <input id="f-task" type="text" maxlength="80" placeholder="e.g. Study Deep Learning"></label>
+          <label>Activity <input id="f-task" name="activity-title" type="text" maxlength="80" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" placeholder="e.g. Study Deep Learning"></label>
           <label>Category <select id="f-cat"></select></label>
           <label>Date <input id="f-date" type="date"></label>
           <label>Duration: <output id="o-hours">1.0</output> hrs
@@ -59,6 +59,7 @@
           <label>Intensity: <output id="o-int">3</output> / 5 <small>(1 light · 5 draining)</small>
             <input id="f-int" type="range" min="1" max="5" step="1" value="3"></label>
           <p id="form-err" class="err" hidden></p>
+          <p id="form-ok" class="ok" role="status" hidden></p>
           <button class="primary" type="submit">Add to schedule</button>
         </form>
         <div class="card">
@@ -191,6 +192,6 @@
   </main>
 
   <footer>Cognitive Balance 2.0 · not medical advice</footer>
-  <script src="app.js"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>

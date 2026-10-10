@@ -364,9 +364,13 @@ function initExams() {
 }
 
 /* --------------------------------------------------------------- actions */
-function addEntry(e) {
-  S.schedule.push(cleanEntry(e));
+function addEntry(e, follow = false) {
+  const entry = cleanEntry(e);
+  S.schedule.push(entry);
+  // If the activity is for another day, jump to that day so it is visible straight away.
+  if (follow && entry.date !== viewDate) { viewDate = entry.date; $("#viewDate").value = viewDate; }
   save(); renderDashboard(); renderPlanner();
+  return entry;
 }
 
 function initTabs() {
@@ -386,12 +390,19 @@ function initPlanner() {
 
   $("#add-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    const task = $("#f-task").value.trim(), err = $("#form-err");
-    if (!task) { err.textContent = "Give the activity a name."; err.hidden = false; return; }
+    const input = $("#f-task"), err = $("#form-err"), ok = $("#form-ok");
+    const task = input.value.trim();
+    ok.hidden = true;
+    if (!task) { err.textContent = "Give the activity a name."; err.hidden = false; input.focus(); return; }
     err.hidden = true;
-    addEntry({ task, category: $("#f-cat").value, date: $("#f-date").value, hours: $("#f-hours").value, intensity: $("#f-int").value });
-    $("#f-task").value = "";
+    const entry = addEntry({ task, category: $("#f-cat").value, date: $("#f-date").value, hours: $("#f-hours").value, intensity: $("#f-int").value }, true);
+    input.value = "";
+    ok.textContent = `✅ Added "${entry.task}" on ${entry.date}.`;
+    ok.hidden = false;
+    clearTimeout(ok._t); ok._t = setTimeout(() => (ok.hidden = true), 4000);
+    input.focus();
   });
+  $("#f-task").addEventListener("input", () => ($("#form-err").hidden = true));
 
   const tbody = $("#rows");
   tbody.addEventListener("change", (ev) => {

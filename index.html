@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cognitive Balance 2.0</title>
+  <meta name="description" content="Support healthier routines, focus, and balance. Track deep work vs recovery and spot burnout early.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>🧠 Cognitive Balance <span class="ver">2.0</span></h1>
+      <p class="tag">Support healthier routines, focus, and balance.</p>
+    </div>
+    <label class="daypick">Day
+      <input type="date" id="viewDate">
+    </label>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="dashboard" class="active">📊 Dashboard</button>
+    <button role="tab" data-tab="planner">📅 Planner</button>
+    <button role="tab" data-tab="wellness">🧘 Wellness</button>
+    <button role="tab" data-tab="settings">⚙️ Settings &amp; Data</button>
+  </nav>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="panel">
+      <div class="metrics">
+        <div class="card metric"><span class="lbl">Work load</span><b id="m-load">–</b><small id="m-load-sub"></small></div>
+        <div class="card metric"><span class="lbl">Physical recovery</span><b id="m-phys">–</b></div>
+        <div class="card metric"><span class="lbl">Mental rest</span><b id="m-mental">–</b></div>
+        <div class="card metric"><span class="lbl">Balance score</span><b id="m-score">–</b></div>
+      </div>
+      <div class="bar"><div id="score-bar"></div></div>
+      <div id="status" class="status"></div>
+      <details id="tips-box" class="card"><summary>What should I do next?</summary><ul id="tips"></ul></details>
+      <div class="grid2">
+        <div class="card"><h3>Today's split</h3><div id="donut"></div></div>
+        <div class="card"><h3>Last 7 days</h3><div id="week"></div></div>
+      </div>
+    </section>
+
+    <!-- PLANNER -->
+    <section id="tab-planner" class="panel" hidden>
+      <div class="grid-planner">
+        <form id="add-form" class="card" autocomplete="off">
+          <h3>Add activity</h3>
+          <label>Name <input id="f-task" type="text" maxlength="80" placeholder="e.g. Study Deep Learning"></label>
+          <label>Category <select id="f-cat"></select></label>
+          <label>Date <input id="f-date" type="date"></label>
+          <label>Duration: <output id="o-hours">1.0</output> hrs
+            <input id="f-hours" type="range" min="0.5" max="8" step="0.5" value="1"></label>
+          <label>Intensity: <output id="o-int">3</output> / 5 <small>(1 light · 5 draining)</small>
+            <input id="f-int" type="range" min="1" max="5" step="1" value="3"></label>
+          <p id="form-err" class="err" hidden></p>
+          <button class="primary" type="submit">Add to schedule</button>
+        </form>
+        <div class="card">
+          <div class="row-between">
+            <h3>Schedule</h3>
+            <label class="inline">Show
+              <select id="filter"><option value="day">Selected day</option><option value="all">All days</option></select>
+            </label>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Date</th><th>Task</th><th>Category</th><th>Hrs</th><th>Int.</th><th></th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p id="empty-rows" class="muted" hidden>Nothing scheduled here yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- WELLNESS -->
+    <section id="tab-wellness" class="panel" hidden>
+      <div class="card">
+        <h3>1. State of mind check-in</h3>
+        <p class="muted">Self-awareness is the first step in preventing burnout.</p>
+        <input id="mood-range" type="range" min="0" max="4" step="1" value="2">
+        <div class="mood-labels" id="mood-labels"></div>
+        <input id="mood-note" type="text" maxlength="120" placeholder="Optional note — what's driving this?">
+        <button id="mood-log" class="primary">Log mood</button>
+        <div id="mood-feedback"></div>
+        <div id="mood-chart"></div>
+        <details id="mood-hist-box"><summary>Mood history</summary><ul id="mood-hist"></ul></details>
+      </div>
+
+      <div class="card">
+        <h3>2. Focus timer</h3>
+        <p class="muted">Finished focus blocks are logged to today's schedule automatically.</p>
+        <div class="timer">
+          <div id="t-display" class="t-display">25:00</div>
+          <div class="bar"><div id="t-bar"></div></div>
+          <p id="t-msg" class="muted"></p>
+          <div class="row">
+            <select id="t-preset"><option>25/5</option><option>50/10</option><option>90/20</option></select>
+            <button id="t-start" class="primary">▶ Start focus block</button>
+            <button id="t-stop" hidden>Stop</button>
+          </div>
+          <small id="t-count" class="muted"></small>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3. Tactical reset — 4-7-8 breathing</h3>
+        <div class="breath">
+          <div id="breath-wrap"><div id="breath-circle"></div></div>
+          <div id="breath-label" class="muted">Ready when you are.</div>
+          <div class="row">
+            <label class="inline">Cycles <select id="cycles"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+            <button id="breath-start" class="primary">Start breathing exercise</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>4. Suggested disconnect routines</h3>
+        <ul>
+          <li><b>Digital detox:</b> switch off monitors 1 hour before bed. Reading fiction in low light reduces eye strain after heavy coding sessions.</li>
+          <li><b>Physical reset:</b> regular strength training and walks help regulate stress and sleep.</li>
+          <li><b>Micro-breaks:</b> look at something 20 feet away for 20 seconds every 20 minutes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="panel" hidden>
+      <div class="grid2">
+        <div class="card">
+          <h3>Your limits</h3>
+          <label>Max load-adjusted work hrs / day <input id="s-max" type="number" min="1" max="16" step="0.5"></label>
+          <label>Min recovery hrs / day <input id="s-min" type="number" min="0" max="8" step="0.5"></label>
+          <label>Max work : recovery ratio <input id="s-ratio" type="number" min="1" max="6" step="0.5"></label>
+          <p class="muted">Load = Σ (deep-work hours × intensity ÷ 3). Intensity 3 is the baseline.</p>
+        </div>
+        <div class="card">
+          <h3>Data</h3>
+          <p class="muted">Everything is stored in this browser (localStorage). Nothing is sent to a server.</p>
+          <div class="col">
+            <button id="d-json">⬇ Backup (JSON)</button>
+            <button id="d-csv">⬇ Schedule (CSV)</button>
+            <label class="filebtn">⬆ Restore backup<input id="d-restore" type="file" accept="application/json" hidden></label>
+            <button id="d-reset" class="danger">🗑 Reset everything</button>
+          </div>
+          <p id="d-msg" class="muted"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Cognitive Balance 2.0 · not medical advice</footer>
+  <script src="app.js"></script>
+</body>
+</html>

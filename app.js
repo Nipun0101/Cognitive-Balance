@@ -132,18 +132,52 @@ function suggestions(st, mood) {
 const latestMood = () => (S.moods.length ? S.moods[S.moods.length - 1].mood : null);
 
 /* ----------------------------------------------------------------- charts */
-function donutSVG(parts) {
+let donutSel = null; // null = closed, "all", or a category name
+
+function donutSVG(parts, sel) {
   const total = parts.reduce((a, p) => a + p.v, 0);
   if (!total) return '<p class="muted">No hours logged.</p>';
+  const dim = (n) => sel && sel !== "all" && sel !== n;
   let off = 25, rings = "";
   for (const p of parts) {
     if (!p.v) continue;
     const pct = (p.v / total) * 100;
-    rings += `<circle r="15.9155" cx="21" cy="21" fill="none" stroke="${p.c}" stroke-width="6" stroke-dasharray="${pct} ${100 - pct}" stroke-dashoffset="${off}"><title>${esc(p.n)}: ${round1(p.v)} hrs</title></circle>`;
+    rings += `<circle class="slice" data-cat="${esc(p.n)}" tabindex="0" role="button" aria-label="Show ${esc(p.n)} breakdown" r="15.9155" cx="21" cy="21" fill="none" stroke="${p.c}" stroke-width="${sel === p.n ? 7.5 : 6}" stroke-dasharray="${pct} ${100 - pct}" stroke-dashoffset="${off}" opacity="${dim(p.n) ? 0.3 : 1}"><title>${esc(p.n)}: ${round1(p.v)} hrs. Click for breakdown</title></circle>`;
     off -= pct;
   }
-  const legend = parts.map((p) => `<span><i class="dot" style="background:${p.c}"></i>${esc(p.n)} ${round1(p.v)}h</span>`).join("");
-  return `<svg viewBox="0 0 42 42" width="170" height="170" role="img" aria-label="Today's hours by category">${rings}<text x="21" y="22.5" text-anchor="middle" style="font-size:6px;fill:var(--text)">${round1(total)}h</text></svg><div class="legend">${legend}</div>`;
+  const legend = parts.map((p) => `<span class="lg${dim(p.n) ? " off" : ""}" data-cat="${esc(p.n)}" role="button" tabindex="0"><i class="dot" style="background:${p.c}"></i>${esc(p.n)} ${round1(p.v)}h</span>`).join("");
+  return `<svg viewBox="0 0 42 42" width="170" height="170" role="img" aria-label="Today's hours by category. Click a slice for the breakdown.">${rings}<circle class="hub" data-cat="all" r="10" cx="21" cy="21" fill="transparent"><title>Show all work</title></circle><text x="21" y="22.5" text-anchor="middle" style="font-size:6px;fill:var(--text);pointer-events:none">${round1(total)}h</text></svg><div class="legend">${legend}</div><p class="muted hint">${sel ? "" : "Click a slice to see how your work is distributed."}</p>`;
+}
+
+function donutDetail(day, sel) {
+  if (!sel) return "";
+  const dayRows = S.schedule.filter((e) => e.date === day);
+  const dayTotal = dayRows.reduce((a, e) => a + e.hours, 0);
+  const rows = dayRows.filter((e) => sel === "all" || e.category === sel);
+  const sum = rows.reduce((a, e) => a + e.hours, 0);
+  const title = sel === "all" ? "All work today" : sel;
+  const color = sel === "all" ? "var(--accent)" : COLORS[sel];
+  const head = `<div class="dd-head"><b style="color:${color}">${esc(title)}</b><span class="muted">${round1(sum)}h${dayTotal ? ` · ${Math.round((sum / dayTotal) * 100)}% of the day` : ""}</span><button class="x" data-close aria-label="Close breakdown">✕</button></div>`;
+  if (!rows.length || !sum) return `<div class="dd">${head}<p class="muted">Nothing logged here for this day.</p></div>`;
+
+  const map = new Map();
+  rows.forEach((e) => {
+    const k = e.category + "|" + e.task, o = map.get(k) || { task: e.task, cat: e.category, h: 0 };
+    o.h += e.hours; map.set(k, o);
+  });
+  const items = [...map.values()].sort((a, b) => b.h - a.h);
+
+  const stack = sel === "all"
+    ? `<div class="stack">${CATS.map((c) => {
+        const h = rows.filter((e) => e.category === c).reduce((a, e) => a + e.hours, 0);
+        return h ? `<div style="width:${(h / sum) * 100}%;background:${COLORS[c]}" title="${esc(c)}: ${round1(h)}h"></div>` : "";
+      }).join("")}</div>` : "";
+
+  const list = items.map((o) => {
+    const pct = Math.round((o.h / sum) * 100);
+    return `<li><div class="dd-row"><span><i class="dot" style="background:${COLORS[o.cat]}"></i>${esc(o.task)}</span><span class="muted">${round1(o.h)}h · ${pct}%</span></div><div class="track"><div style="width:${pct}%;background:${COLORS[o.cat]}"></div></div></li>`;
+  }).join("");
+  return `<div class="dd">${head}${stack}<ul class="dd-list">${list}</ul></div>`;
 }
 
 function weekSVG(endDay) {
@@ -212,7 +246,8 @@ function renderDashboard() {
   box.open = status === "critical" || status === "warning";
   $("#tips").innerHTML = suggestions(st, latestMood()).map((t) => `<li>${t}</li>`).join("");
 
-  $("#donut").innerHTML = donutSVG(CATS.map((c) => ({ n: c, c: COLORS[c], v: S.schedule.filter((e) => e.date === viewDate && e.category === c).reduce((a, e) => a + e.hours, 0) })));
+  const parts = CATS.map((c) => ({ n: c, c: COLORS[c], v: S.schedule.filter((e) => e.date === viewDate && e.category === c).reduce((a, e) => a + e.hours, 0) }));
+  $("#donut").innerHTML = donutSVG(parts, donutSel) + donutDetail(viewDate, donutSel);
   $("#week").innerHTML = weekSVG(viewDate);
 }
 
@@ -467,6 +502,26 @@ function download(name, text, type) {
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
+function resetEverything() {
+  stopTimer(); T.completed = 0; T.msg = "";
+  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  S = { schedule: [], moods: [], exams: [], examMode: false, settings: { ...DEFAULTS } };
+  save();
+  viewDate = today(); donutSel = null;
+  $("#viewDate").value = viewDate; $("#f-date").value = viewDate; $("#x-date").value = addDays(viewDate, 7);
+  $("#filter").value = "day";
+  ["#f-task", "#mood-note", "#x-subject"].forEach((id) => ($(id).value = ""));
+  $("#mood-range").value = 2;
+  $("#f-hours").value = 1; $("#o-hours").textContent = "1.0";
+  $("#f-int").value = 3; $("#o-int").textContent = "3";
+  $("#x-hours").value = 10; $("#o-xh").textContent = "10";
+  $("#x-diff").value = 3; $("#o-xd").textContent = "3";
+  $("#mood-feedback").innerHTML = ""; $("#plan-msg").textContent = "";
+  $("#form-err").hidden = true; $("#x-err").hidden = true;
+  document.title = "Cognitive Balance 2.0";
+  renderAll(); renderTimer();
+}
+
 function initSettings() {
   const upd = () => {
     S.settings = cleanState({ settings: { maxLoad: $("#s-max").value, minRecovery: $("#s-min").value, ratio: $("#s-ratio").value } }).settings;
@@ -491,13 +546,37 @@ function initSettings() {
     } catch { msg("That file isn't a valid Cognitive Balance backup."); }
     ev.target.value = "";
   });
-  $("#d-reset").addEventListener("click", () => {
-    if (!confirm("Delete all schedule, mood and settings data from this browser?")) return;
-    localStorage.removeItem(KEY); S = cleanState(null); save(); renderAll(); msg("Everything reset.");
+  let armed = null;
+  const resetBtn = $("#d-reset"), idle = resetBtn.textContent;
+  resetBtn.addEventListener("click", () => {
+    if (!armed) { // two-step confirm (window.confirm can be blocked in some browsers)
+      resetBtn.textContent = "⚠ Click again to erase everything";
+      armed = setTimeout(() => { armed = null; resetBtn.textContent = idle; }, 4000);
+      return;
+    }
+    clearTimeout(armed); armed = null; resetBtn.textContent = idle;
+    resetEverything();
+    msg("Everything was erased. You're starting fresh.");
   });
 }
 
 /* ------------------------------------------------------------------ boot */
+function initDonut() {
+  const dn = $("#donut");
+  dn.addEventListener("click", (ev) => {
+    if (ev.target.closest("[data-close]")) { donutSel = null; return renderDashboard(); }
+    const t = ev.target.closest("[data-cat]");
+    if (!t) return;
+    const c = t.dataset.cat;
+    donutSel = donutSel === c ? (c === "all" ? null : "all") : c;
+    renderDashboard();
+  });
+  dn.addEventListener("keydown", (ev) => {
+    const t = ev.target.closest("[data-cat]");
+    if (t && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); t.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+  });
+}
+
 function init() {
   const dp = $("#viewDate");
   dp.value = viewDate;
@@ -506,7 +585,7 @@ function init() {
     viewDate = dp.value; $("#f-date").value = viewDate;
     renderDashboard(); renderPlanner(); $("#mood-feedback").innerHTML = "";
   });
-  initTabs(); initPlanner(); initExams(); initMood(); initTimer(); initSettings();
+  initTabs(); initPlanner(); initExams(); initDonut(); initMood(); initTimer(); initSettings();
   $("#breath-start").addEventListener("click", runBreathing);
   renderAll();
 }

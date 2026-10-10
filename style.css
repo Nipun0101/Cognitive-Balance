@@ -76,3 +76,18 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:1.5rem}
 .exam.urgent .days{color:var(--crit)}
 .exam .info{flex:1}.exam .info small{color:var(--muted);display:block}
 tr.plan td:first-child{border-left:3px solid var(--accent)}
+
+/* clickable donut + breakdown */
+.slice,.hub{cursor:pointer;transition:opacity .2s,stroke-width .2s}
+.slice:focus-visible,.lg:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.lg{cursor:pointer}.lg.off{opacity:.45}
+.hint{font-size:.8rem;margin:.4rem 0 0}
+.dd{margin-top:.8rem;border-top:1px solid var(--line);padding-top:.7rem}
+.dd-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem}
+.dd-head .x{margin-left:auto}
+.stack{display:flex;height:14px;border-radius:99px;overflow:hidden;margin-bottom:.6rem;background:var(--line)}
+.dd-list{list-style:none;padding:0;margin:0}
+.dd-list li{margin:.5rem 0}
+.dd-row{display:flex;justify-content:space-between;gap:.6rem;font-size:.9rem}
+.track{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:.2rem}
+.track>div{height:100%;border-radius:99px;transition:width .3s}

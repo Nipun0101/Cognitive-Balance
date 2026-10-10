@@ -10,6 +10,12 @@ Static site (HTML/CSS/JS, no build step, no backend) — deploys on Vercel as-is
 
 Run locally: `npx serve .` (or open `index.html`).
 
+## 📚 Exam Season mode (BRANDIT 3.0 twist: "Exam season begins")
+- Add exams with date, study hours needed and difficulty; countdown cards and a dashboard banner appear.
+- **Burnout-safe study plan generator**: spreads study hours evenly across the days left, never exceeding your daily load limit, and auto-adds walk and screen-off recovery blocks so the Balance Score stays healthy.
+- Exam mode shifts limits (+2 hrs load, +0.5 hr recovery, +0.5 ratio) and adds sleep-protection advice in the final 3 days.
+- If the target can't fit before the exam, the app tells you instead of silently overloading you.
+
 ## Features
 - Intensity-weighted burnout model, 0–100 Balance Score, adjustable limits
 - Dated schedule with inline editing and delete

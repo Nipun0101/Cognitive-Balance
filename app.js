@@ -36,6 +36,17 @@ function cleanEntry(e) {
     category: CATS.includes(e.category) ? e.category : "Deep Work",
     hours: clamp(Number(e.hours) || 0, 0, 24),
     intensity: Math.round(clamp(Number(e.intensity) || 3, 1, 5)),
+    ...(e.src === "plan" ? { src: "plan", examId: String(e.examId || "") } : {}),
+  };
+}
+
+function cleanExam(x) {
+  return {
+    id: x.id || uid(),
+    subject: String(x.subject || "").trim().slice(0, 60) || "Exam",
+    date: isDate(x.date) ? x.date : today(),
+    hours: clamp(Number(x.hours) || 10, 1, 100),
+    difficulty: Math.round(clamp(Number(x.difficulty) || 3, 1, 5)),
   };
 }
 
@@ -43,6 +54,8 @@ function cleanState(raw) {
   const r = raw && typeof raw === "object" ? raw : {};
   return {
     schedule: Array.isArray(r.schedule) ? r.schedule.map(cleanEntry) : sampleSchedule(),
+    exams: Array.isArray(r.exams) ? r.exams.map(cleanExam) : [],
+    examMode: r.examMode === true,
     moods: (Array.isArray(r.moods) ? r.moods : []).filter((m) => MOODS.includes(m.mood) && m.time).slice(-200),
     settings: {
       maxLoad: clamp(Number(r.settings?.maxLoad) || DEFAULTS.maxLoad, 1, 16),
@@ -61,6 +74,13 @@ let viewDate = today();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* storage full/blocked */ } };
 
 /* ---------------------------------------------------------- burnout model */
+// Exam Season shifts the limits: heavier days tolerated, but more recovery demanded.
+const eff = () => {
+  const s = S.settings;
+  return S.examMode ? { maxLoad: s.maxLoad + 2, minRecovery: s.minRecovery + 0.5, ratio: s.ratio + 0.5 } : s;
+};
+const daysUntil = (d) => Math.round((new Date(d + "T00:00:00") - new Date(today() + "T00:00:00")) / 864e5);
+const nextExam = () => S.exams.filter((x) => x.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
 function dayStats(day) {
   let work = 0, load = 0, phys = 0, mental = 0;
   for (const e of S.schedule) {
@@ -73,7 +93,7 @@ function dayStats(day) {
 }
 
 function classify(st) {
-  const s = S.settings;
+  const s = eff();
   if (st.work === 0 && st.recovery === 0) return "empty";
   if (st.load > s.maxLoad && st.recovery < s.minRecovery) return "critical";
   if (st.load > st.recovery * s.ratio) return "warning";
@@ -81,7 +101,7 @@ function classify(st) {
 }
 
 function balanceScore(st) {
-  const s = S.settings;
+  const s = eff();
   let score = 100;
   score -= Math.max(0, st.load - s.maxLoad) * 12;
   score -= Math.max(0, s.minRecovery - st.recovery) * 15;
@@ -90,18 +110,21 @@ function balanceScore(st) {
 }
 
 function recoveryNeeded(st) {
-  const s = S.settings;
+  const s = eff();
   return Math.max(0, s.minRecovery - st.recovery, st.load / s.ratio - st.recovery);
 }
 
 function suggestions(st, mood) {
-  const s = S.settings, tips = [], need = recoveryNeeded(st);
+  const s = eff(), tips = [], need = recoveryNeeded(st);
   if (need > 0) tips.push(`Add about <b>${round1(need)} hr</b> of recovery to get back in range.`);
   if (st.load >= 3 && st.mental === 0) tips.push("No mental rest scheduled — try 30–60 min of reading, music or a walk without a screen.");
   if (st.load >= 3 && st.phys === 0) tips.push("No physical recovery yet — even a 20-minute walk or stretch helps reset focus.");
   if (st.load > s.maxLoad) tips.push("Your load is above your daily limit. Consider moving one deep-work block to another day.");
   if ((mood === "Exhausted" || mood === "Stressed") && st.load >= s.maxLoad * 0.6)
     tips.push(`You logged <b>${esc(mood)}</b> and the day is heavy — shorten the next focus block and take a break first.`);
+  const nx = nextExam();
+  if (S.examMode && nx && daysUntil(nx.date) <= 3 && daysUntil(nx.date) >= 0)
+    tips.push(`<b>${esc(nx.subject)}</b> is ${daysUntil(nx.date) === 0 ? "today" : "in " + daysUntil(nx.date) + " day(s)"}: protect your sleep, no all-nighters, and keep revision light and recovery-heavy.`);
   if (!tips.length) tips.push("Nothing to fix — keep the rhythm and protect your recovery time.");
   return tips;
 }
@@ -159,7 +182,7 @@ function moodSVG() {
 
 /* ---------------------------------------------------------------- render */
 function renderDashboard() {
-  const st = dayStats(viewDate), status = classify(st), score = balanceScore(st), s = S.settings;
+  const st = dayStats(viewDate), status = classify(st), score = balanceScore(st), s = eff();
   $("#m-load").textContent = `${round1(st.load)} hrs`;
   const diff = round1(st.load - s.maxLoad);
   $("#m-load-sub").textContent = `${diff > 0 ? "+" : ""}${diff} vs limit · raw ${round1(st.work)}h`;
@@ -169,6 +192,10 @@ function renderDashboard() {
   const bar = $("#score-bar");
   bar.style.width = status === "empty" ? "0%" : `${score}%`;
   bar.style.background = score >= 70 ? "var(--ok)" : score >= 40 ? "var(--warn)" : "var(--crit)";
+
+  const nb = $("#exam-next"), nx = nextExam();
+  nb.hidden = !(S.examMode && nx);
+  if (nx) nb.textContent = `📚 Exam season: ${nx.subject} in ${daysUntil(nx.date)} day(s) (${nx.date}). Limits adjusted for exam mode.`;
 
   const msg = {
     empty: "Nothing scheduled for this day yet — add activities in the Planner tab.",
@@ -194,7 +221,7 @@ function renderPlanner() {
   const rows = S.schedule.filter((e) => all || e.date === viewDate).sort((a, b) => b.date.localeCompare(a.date));
   $("#empty-rows").hidden = rows.length > 0;
   $("#rows").innerHTML = rows.map((e) => `
-    <tr data-id="${esc(e.id)}">
+    <tr data-id="${esc(e.id)}"${e.src === "plan" ? ' class="plan" title="Added by the study plan generator"' : ""}>
       <td><input type="date" data-f="date" value="${esc(e.date)}" aria-label="Date"></td>
       <td><input type="text" data-f="task" maxlength="80" value="${esc(e.task)}" aria-label="Task"></td>
       <td><select data-f="category" aria-label="Category">${CATS.map((c) => `<option${c === e.category ? " selected" : ""}>${c}</option>`).join("")}</select></td>
@@ -217,7 +244,89 @@ function renderSettings() {
   $("#s-ratio").value = S.settings.ratio;
 }
 
-function renderAll() { renderDashboard(); renderPlanner(); renderMood(); renderSettings(); }
+function renderAll() { renderDashboard(); renderPlanner(); renderExams(); renderMood(); renderSettings(); }
+
+/* ------------------------------------------------------------ exam season */
+function generatePlan() {
+  const t = today(), notes = [], touched = new Set();
+  S.schedule = S.schedule.filter((e) => !(e.src === "plan" && e.date >= t));
+  const exams = S.exams.filter((x) => x.date > t).sort((a, b) => a.date.localeCompare(b.date));
+  if (!exams.length) return "Add at least one upcoming exam first.";
+
+  exams.forEach((x) => {
+    const days = [];
+    for (let d = t; d < x.date; d = addDays(d, 1)) days.push(d);
+    const perHour = x.difficulty / 3;
+    const caps = days.map((d) => Math.min(6, Math.max(0, (eff().maxLoad - dayStats(d).load) / perHour)));
+    const alloc = days.map(() => 0);
+    let left = x.hours, progress = true;
+    while (left >= 0.5 && progress) {
+      progress = false;
+      for (let i = 0; i < days.length && left >= 0.5; i++) {
+        if (alloc[i] + 0.5 <= caps[i] + 1e-9) { alloc[i] += 0.5; left -= 0.5; progress = true; }
+      }
+    }
+    days.forEach((d, i) => {
+      if (alloc[i] > 0) {
+        S.schedule.push(cleanEntry({ date: d, task: `Study: ${x.subject}`, category: "Deep Work", hours: alloc[i], intensity: x.difficulty, src: "plan", examId: x.id }));
+        touched.add(d);
+      }
+    });
+    if (left >= 0.5) notes.push(`${x.subject}: ${round1(left)}h could not fit under your limits before the exam. Start earlier, cut the target, or raise your limits.`);
+  });
+
+  touched.forEach((d) => {
+    const need = recoveryNeeded(dayStats(d));
+    if (need > 0) {
+      const half = Math.max(0.5, Math.ceil(need) / 2);
+      S.schedule.push(cleanEntry({ date: d, task: "Walk / stretch break", category: "Physical Recovery", hours: half, intensity: 2, src: "plan", examId: "recovery" }));
+      S.schedule.push(cleanEntry({ date: d, task: "Screen-off reading / music", category: "Mental Rest", hours: half, intensity: 1, src: "plan", examId: "recovery" }));
+    }
+  });
+  save(); renderAll();
+  const planned = S.schedule.filter((e) => e.src === "plan" && e.examId !== "recovery").reduce((a, e) => a + e.hours, 0);
+  return `Plan created: ${round1(planned)}h of study across ${touched.size} day(s), with recovery blocks added automatically. ` + notes.join(" ");
+}
+
+function renderExams() {
+  $("#exam-mode").checked = S.examMode;
+  const list = S.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
+  $("#exam-list").innerHTML = list.length ? list.map((x) => {
+    const n = daysUntil(x.date);
+    const planned = S.schedule.filter((e) => e.examId === x.id).reduce((a, e) => a + e.hours, 0);
+    return `<div class="exam${n >= 0 && n <= 3 ? " urgent" : ""}" data-id="${esc(x.id)}">
+      <div class="days">${n < 0 ? "done" : n}<small>${n < 0 ? "" : "days left"}</small></div>
+      <div class="info"><b>${esc(x.subject)}</b><small>${esc(x.date)} · difficulty ${x.difficulty}/5 · ${x.hours}h needed · ${round1(planned)}h planned</small></div>
+      <button class="x" data-del-exam aria-label="Delete exam">✕</button></div>`;
+  }).join("") : '<p class="muted">No exams yet. Add one on the left.</p>';
+}
+
+function initExams() {
+  $("#x-date").value = addDays(today(), 7);
+  $("#x-hours").addEventListener("input", (e) => ($("#o-xh").textContent = e.target.value));
+  $("#x-diff").addEventListener("input", (e) => ($("#o-xd").textContent = e.target.value));
+  $("#exam-mode").addEventListener("change", (e) => { S.examMode = e.target.checked; save(); renderAll(); });
+  $("#exam-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const subject = $("#x-subject").value.trim(), err = $("#x-err");
+    if (!subject) { err.textContent = "Enter the subject."; err.hidden = false; return; }
+    if (!isDate($("#x-date").value)) { err.textContent = "Pick the exam date."; err.hidden = false; return; }
+    err.hidden = true;
+    S.exams.push(cleanExam({ subject, date: $("#x-date").value, hours: $("#x-hours").value, difficulty: $("#x-diff").value }));
+    S.examMode = true;
+    $("#x-subject").value = "";
+    save(); renderAll();
+  });
+  $("#exam-list").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-del-exam]");
+    if (!b) return;
+    const id = b.closest(".exam").dataset.id;
+    S.exams = S.exams.filter((x) => x.id !== id);
+    S.schedule = S.schedule.filter((e) => e.examId !== id);
+    save(); renderAll();
+  });
+  $("#plan-btn").addEventListener("click", () => { $("#plan-msg").textContent = generatePlan(); });
+}
 
 /* --------------------------------------------------------------- actions */
 function addEntry(e) {
@@ -397,7 +506,7 @@ function init() {
     viewDate = dp.value; $("#f-date").value = viewDate;
     renderDashboard(); renderPlanner(); $("#mood-feedback").innerHTML = "";
   });
-  initTabs(); initPlanner(); initMood(); initTimer(); initSettings();
+  initTabs(); initPlanner(); initExams(); initMood(); initTimer(); initSettings();
   $("#breath-start").addEventListener("click", runBreathing);
   renderAll();
 }

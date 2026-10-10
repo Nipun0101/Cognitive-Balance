@@ -22,6 +22,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="dashboard" class="active">📊 Dashboard</button>
     <button role="tab" data-tab="planner">📅 Planner</button>
+    <button role="tab" data-tab="exams">📚 Exam Season</button>
     <button role="tab" data-tab="wellness">🧘 Wellness</button>
     <button role="tab" data-tab="settings">⚙️ Settings &amp; Data</button>
   </nav>
@@ -29,6 +30,7 @@
   <main>
     <!-- DASHBOARD -->
     <section id="tab-dashboard" class="panel">
+      <div id="exam-next" class="exam-banner" hidden></div>
       <div class="metrics">
         <div class="card metric"><span class="lbl">Work load</span><b id="m-load">–</b><small id="m-load-sub"></small></div>
         <div class="card metric"><span class="lbl">Physical recovery</span><b id="m-phys">–</b></div>
@@ -73,6 +75,40 @@
             </table>
           </div>
           <p id="empty-rows" class="muted" hidden>Nothing scheduled here yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXAM SEASON -->
+    <section id="tab-exams" class="panel" hidden>
+      <div class="card exam-hero">
+        <div>
+          <h3>📚 Exam Season mode</h3>
+          <p class="muted">Exams change the rules: heavier study days are tolerated, but the app demands more recovery and warns you about the all-nighter trap. Limits shift by <b>+2 hrs load, +0.5 hr recovery, +0.5 ratio</b>.</p>
+        </div>
+        <label class="switch"><input type="checkbox" id="exam-mode"> <span>Exam mode</span></label>
+      </div>
+      <div class="grid-planner">
+        <form id="exam-form" class="card" autocomplete="off">
+          <h3>Add exam</h3>
+          <label>Subject <input id="x-subject" type="text" maxlength="60" placeholder="e.g. Deep Learning MTE"></label>
+          <label>Exam date <input id="x-date" type="date"></label>
+          <label>Study hours needed: <output id="o-xh">10</output> hrs
+            <input id="x-hours" type="range" min="2" max="60" step="1" value="10"></label>
+          <label>Difficulty: <output id="o-xd">3</output> / 5
+            <input id="x-diff" type="range" min="1" max="5" step="1" value="3"></label>
+          <p id="x-err" class="err" hidden></p>
+          <button class="primary" type="submit">Add exam</button>
+        </form>
+        <div>
+          <div class="card">
+            <div class="row-between">
+              <h3>Upcoming exams</h3>
+              <button id="plan-btn" class="primary">⚡ Generate burnout-safe study plan</button>
+            </div>
+            <p id="plan-msg" class="muted"></p>
+            <div id="exam-list"></div>
+          </div>
         </div>
       </div>
     </section>
